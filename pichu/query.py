@@ -22,12 +22,166 @@ class MergeableSQLPartBuilder(SQLPartBuilder):
         raise NotImplementedError()
 
 
+class ConditionExpSQLPartBuilder(MergeableSQLPartBuilder):
+
+    def __init__(self, field, operator, value):
+        super(ConditionExpSQLPartBuilder, self).__init__()
+        self.field = field
+        self.operator = operator
+        self.value = value
+
+    def _as_sql(self):
+        return "%s %s ?" % (self.field, self.operator)
+
+    def _as_parameters(self):
+        return (self.value,)
+
+
+class MultiConditionSQLPartBuilder(MergeableSQLPartBuilder):
+
+    def __init__(self, right, operator, left=None):
+        super(ConditionExpSQLPartBuilder, self).__init__()
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+    def _merge_from(self, left):
+        self.left = left
+        return self
+
+    def _as_sql(self):
+        if isinstance(
+            self.right,
+            (ConditionExpSQLPartBuilder, MultiConditionSQLPartBuilder)
+        ):
+            right_exp = "(%s)" % self.right._as_sql()
+        else:
+            right_exp = self.right
+
+        if not self.left:
+            return right_exp
+
+        if isinstance(
+            self.left,
+            (ConditionExpSQLPartBuilder, MultiConditionSQLPartBuilder)
+        ):
+            left_exp = "(%s)" % self.left._as_sql()
+        else:
+            left_exp = self.left
+
+        return "%s %s %s" % (left_exp, self.operator, right_exp)
+
+    def _as_parameters(self):
+        params = self.right._as_parameters()
+        if self.left:
+            params = self.left._as_parameters() + params
+        return params
+
+    @classmethod
+    def and_(cls, left, right):
+        return cls(left=left, operator="and", right=right)
+
+    @classmethod
+    def or_(cls, left, right):
+        return cls(left=left, operator="or", right=right)
+
+
 class AppendableSQLPartBuilder(SQLPartBuilder):
 
     def _append_from(self, part):
         if not part:
             return None
         raise NotImplementedError()
+
+
+class InsertValueSQLPartBuilder(AppendableSQLPartBuilder):
+
+    def __init__(self, model_meta, **kwargs):
+        self.model_meta = model_meta
+        self.keys = []
+        self.values = []
+        self.last = None
+
+        for f in model_meta.fields:
+            if f.attr in kwargs:
+                value = kwargs.pop(f.attr)
+            elif hasattr(f, "default"):
+                value = f.default
+            else:
+                raise SQLValueError("value of %s not specified" % f.attr)
+
+            self.keys.append(f.column)
+            self.values.append(value)
+
+        self.keys = tuple(self.keys)
+        self.values = tuple(self.values)
+
+        super(InsertValueSQLPartBuilder, self).__init__()
+
+    def _append_from(self, last):
+        self.last = last
+        return self
+
+    def _as_sql(self):
+        if self.last:
+            values = self.last._as_sql()
+        else:
+            values = ()
+        sql_parts = values + ("(%s)" % ",".join("?" for i in self.keys),)
+        return ", ".join(sql_parts)
+
+    def _as_parameters(self):
+        if self.last:
+            values = self.last._as_parameters()
+        else:
+            values = ()
+        return values + self.values
+
+
+class UpdateValueSQLPartBuilder(AppendableSQLPartBuilder):
+
+    def __init__(self, model_meta, **kwargs):
+        self.model_meta = model_meta
+        self.keys = []
+        self.values = []
+        self.last = None
+
+        for f in model_meta.fields:
+            if f.attr not in kwargs:
+                continue
+
+            value = kwargs.pop(f.attr)
+
+            self.keys.append(f.column)
+            self.values.append(value)
+
+        self.keys = tuple(self.keys)
+        self.values = tuple(self.values)
+
+        super(UpdateValueSQLPartBuilder, self).__init__()
+
+    def _append_from(self, last):
+        self.last = last
+        return self
+
+    def _as_sql(self):
+        if self.last:
+            values = self.last._as_sql()
+        else:
+            values = ()
+
+        sql_parts = values + (
+            "%s=?" % k
+            for k in self.keys
+        )
+        return ", ".join(sql_parts)
+
+    def _as_parameters(self):
+        if self.last:
+            values = self.last._as_parameters()
+        else:
+            values = ()
+        return values + self.values
 
 
 class BaseSQLBuilder(object):
