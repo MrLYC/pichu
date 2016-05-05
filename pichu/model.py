@@ -117,7 +117,10 @@ class BaseModel(six.with_metaclass(ModelMeta, object)):
 
     def _set_model_value(self, **kwargs):
         for f in self.X.fields:
-            value = kwargs.pop(f.attr, f.default)
+            if f.attr in kwargs:
+                value = kwargs.pop(f.attr)
+            elif hasattr(f, "default"):
+                value = f.default
             setattr(self, f.attr, f.to_model_value(value))
 
     @property
@@ -141,17 +144,14 @@ class SimpleTypeFieldMixin(object):
 
 
 class IntFieldType(SimpleTypeFieldMixin, BaseFieldType):
-    default = 0
     ValueConvertor = int
 
 
 class FloatFieldType(SimpleTypeFieldMixin, BaseFieldType):
-    default = 0.0
     ValueConvertor = float
 
 
 class TextFieldType(BaseFieldType):
-    default = ""
 
     def __init__(self, **kwargs):
         self.encoding = "utf-8"
