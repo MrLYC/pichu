@@ -10,6 +10,10 @@ class PrimaryKeyNotFound(Exception):
     pass
 
 
+class ModelNameConflictError(Exception):
+    pass
+
+
 class ModelMetaAttrs(dict):
 
     def __init__(self, **kwargs):
@@ -53,6 +57,7 @@ class BaseFieldType(object):
 
 
 class ModelMeta(type):
+    GlobalModels = {}
 
     @staticmethod
     def make_fields_from_attrs(attrs):
@@ -103,10 +108,18 @@ class ModelMeta(type):
             table=table, pk=pk,
         )
 
+    @staticmethod
+    def register_model(name, model):
+        if name in ModelMeta.GlobalModels:
+            raise ModelNameConflictError("%s" % name)
+        ModelMeta.GlobalModels[name] = model
+
     def __new__(cls, name, bases, attrs):
         ModelMeta.setup_meta_attrs(cls, name, bases, attrs)
 
-        return type.__new__(cls, name, bases, attrs)
+        model = type.__new__(cls, name, bases, attrs)
+        ModelMeta.register_model(model.X.table, model)
+        return model
 
 
 class BaseModel(six.with_metaclass(ModelMeta, object)):
