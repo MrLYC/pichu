@@ -1,5 +1,6 @@
 import six
 from copy import deepcopy
+import operator
 
 
 class MultiPrimaryKeyError(Exception):
@@ -70,7 +71,9 @@ class ModelMeta(type):
 
                 fields.append(value)
 
-        return fields
+        fields.sort(key=operator.attrgetter("column"))
+
+        return tuple(fields)
 
     @staticmethod
     def get_model_table(cls, name, attrs):
