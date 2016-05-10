@@ -144,14 +144,17 @@ class SimpleTypeFieldMixin(object):
 
 
 class IntFieldType(SimpleTypeFieldMixin, BaseFieldType):
+    DBType = "INT"
     ValueConvertor = int
 
 
 class FloatFieldType(SimpleTypeFieldMixin, BaseFieldType):
+    DBType = "DOUBLE"
     ValueConvertor = float
 
 
 class TextFieldType(BaseFieldType):
+    DBType = "TEXT"
 
     def __init__(self, **kwargs):
         self.encoding = "utf-8"

@@ -337,3 +337,21 @@ class DeleteSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
     def _build_parameters(self):
         return self._build_where_sql_parameters()
+
+
+class CreateTableSQLBuilder(BaseSQLBuilder):
+
+    def _build_sql(self):
+        sql_parts = [
+            "CREATE TABLE IF NOT EXISTS", '"%s"' % self.model_meta.table
+        ]
+        field_parts = []
+        for f in self.model_meta.fields:
+            if f.is_primary_key:
+                field = '"%s" %s %s' % (f.column, f.DBType, "PRIMARY KEY")
+            else:
+                field = '"%s" %s' % (f.column, f.DBType)
+            field_parts.append(field)
+
+        sql_parts.extend(["(", ",".join(field_parts), ")"])
+        return "%s;" % " ".join(sql_parts)
