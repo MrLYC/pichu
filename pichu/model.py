@@ -104,21 +104,22 @@ class ModelMeta(type):
         table = ModelMeta.get_model_table(cls, name, attrs)
 
         attrs["X"] = ModelMetaAttrs(
-            model=cls, fields=fields,
-            table=table, pk=pk,
+            fields=fields, table=table, pk=pk,
         )
 
     @staticmethod
-    def register_model(name, model):
+    def register_model(model):
+        name = model.X.table
         if name in ModelMeta.GlobalModels:
             raise ModelNameConflictError("%s" % name)
         ModelMeta.GlobalModels[name] = model
+        model.X.model = model
 
     def __new__(cls, name, bases, attrs):
         ModelMeta.setup_meta_attrs(cls, name, bases, attrs)
 
         model = type.__new__(cls, name, bases, attrs)
-        ModelMeta.register_model(model.X.table, model)
+        ModelMeta.register_model(model)
         return model
 
 

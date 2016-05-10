@@ -17,9 +17,7 @@ class SQLPartBuilder(object):
 class MergeableSQLPartBuilder(SQLPartBuilder):
 
     def _merge_from(self, part):
-        if not part:
-            return None
-        raise NotImplementedError()
+        return self
 
 
 class ConditionExpSQLPartBuilder(MergeableSQLPartBuilder):
@@ -31,7 +29,7 @@ class ConditionExpSQLPartBuilder(MergeableSQLPartBuilder):
         self.value = value
 
     def _as_sql(self):
-        return "%s %s ?" % (self.field, self.operator)
+        return ['"%s" %s ?' % (self.field, self.operator)]
 
     def _as_parameters(self):
         return (self.value,)
@@ -89,9 +87,7 @@ class MultiConditionSQLPartBuilder(MergeableSQLPartBuilder):
 class AppendableSQLPartBuilder(SQLPartBuilder):
 
     def _append_from(self, part):
-        if not part:
-            return None
-        raise NotImplementedError()
+        return self
 
 
 class InsertValueSQLPartBuilder(AppendableSQLPartBuilder):
@@ -128,7 +124,7 @@ class InsertValueSQLPartBuilder(AppendableSQLPartBuilder):
         else:
             values = ()
         sql_parts = values + ("(%s)" % ",".join("?" for i in self.keys),)
-        return ", ".join(sql_parts)
+        return (", ".join(sql_parts),)
 
     def _as_parameters(self):
         if self.last:
@@ -199,6 +195,9 @@ class BaseSQLBuilder(object):
     def _build_parameters(self):
         return tuple()
 
+    def _parse_db_result(self, result):
+        return result
+
 
 class WherePartSQLBuilderMixin(object):
 
@@ -256,12 +255,19 @@ class SelectSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
         self.sort_order_type = type_
 
+    def _parse_db_result(self, result):
+        values = {
+            f.attr: v
+            for f, v in zip(self.model_meta.fields, result)
+        }
+        return self.model_meta.model(**values)
+
     def _build_sql(self):
         sql_parts = ["SELECT"]
-        sql_parts.extend([
-            f.column
+        sql_parts.append(",".join([
+            '"%s"' % f.column
             for f in self.model_meta.fields
-        ])
+        ]))
         sql_parts.extend([
             "FROM", self.model_meta.table,
         ])
@@ -270,7 +276,8 @@ class SelectSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
         if self.order_by_fields:
             sql_parts.extend([
-                "ORDER BY", self.order_by_fields, self.sort_order_type,
+                "ORDER BY", '"%s"' % self.order_by_fields,
+                self.sort_order_type,
             ])
 
         return "%s;" % " ".join(sql_parts)
@@ -290,15 +297,16 @@ class InsertSQLBuilder(BaseSQLBuilder):
         self.insert_value = value._append_from(self.insert_value)
 
     def _build_sql(self):
-        if not self.insert_values:
+        if not self.insert_value:
             raise SQLValueError("insert value is empty")
 
         sql_parts = ["INSERT", "INTO", self.model_meta.table]
-        sql_parts.extend([
-            f.column
+        sql_parts.append("(%s)" % ",".join([
+            '"%s"' % f.column
             for f in self.model_meta.fields
-        ])
-        sql_parts.extend(["VALUES", self.insert_value._as_sql()])
+        ]))
+        sql_parts.extend(["VALUES"])
+        sql_parts.extend(self.insert_value._as_sql())
         return "%s;" % " ".join(sql_parts)
 
     def _build_parameters(self):
