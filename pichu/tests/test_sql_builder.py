@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 from pichu import sql_builder
+from .utils import TestModel
 
 
 class TestMergeableSQLPartBuilder(TestCase):
@@ -70,4 +71,21 @@ class TestMultiConditionSQLPartBuilder(TestCase):
         )
         self.assertTupleEqual(
             builder3._as_parameters(), (123, "test", 123, "test")
+        )
+
+
+class TestInsertSQLBuilder(TestCase):
+    def test_insert(self):
+        builder = sql_builder.InsertSQLBuilder(TestModel.X)
+        builder.insert(id=1, name="test1", value=1)
+        builder.insert(id=2, name="test2")
+        self.assertEqual(
+            builder._build_sql(),
+            'INSERT INTO %s ("id","name","value") VALUES (?,?,?),(?,?,?);' % (
+                TestModel.X.table,
+            )
+        )
+        self.assertTupleEqual(
+            builder._build_parameters(),
+            (1, "test1", 1, 2, "test2", TestModel.value.default),
         )

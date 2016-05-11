@@ -90,50 +90,6 @@ class AppendableSQLPartBuilder(SQLPartBuilder):
         return self
 
 
-class InsertValueSQLPartBuilder(AppendableSQLPartBuilder):
-
-    def __init__(self, model_meta, **kwargs):
-        self.model_meta = model_meta
-        self.keys = []
-        self.values = []
-        self.last = None
-
-        for f in model_meta.fields:
-            if f.attr in kwargs:
-                value = kwargs.pop(f.attr)
-            elif hasattr(f, "default"):
-                value = f.default
-            else:
-                raise SQLValueError("value of %s not specified" % f.attr)
-
-            self.keys.append(f.column)
-            self.values.append(value)
-
-        self.keys = tuple(self.keys)
-        self.values = tuple(self.values)
-
-        super(InsertValueSQLPartBuilder, self).__init__()
-
-    def _append_from(self, last):
-        self.last = last
-        return self
-
-    def _as_sql(self):
-        if self.last:
-            values = self.last._as_sql()
-        else:
-            values = ()
-        sql_parts = values + ("(%s)" % ",".join("?" for i in self.keys),)
-        return (", ".join(sql_parts),)
-
-    def _as_parameters(self):
-        if self.last:
-            values = self.last._as_parameters()
-        else:
-            values = ()
-        return values + self.values
-
-
 class UpdateValueSQLPartBuilder(AppendableSQLPartBuilder):
 
     def __init__(self, model_meta, **kwargs):
@@ -290,14 +246,22 @@ class InsertSQLBuilder(BaseSQLBuilder):
 
     def __init__(self, model_meta):
         super(InsertSQLBuilder, self).__init__(model_meta)
-        self.insert_value = None
+        self.insert_values = []
 
     @chaining_method
-    def insert(self, value):
-        self.insert_value = value._append_from(self.insert_value)
+    def insert(self, **kwargs):
+        values = []
+        for f in self.model_meta.fields:
+            if f.attr in kwargs:
+                values.append(kwargs.pop(f.attr))
+            elif hasattr(f, "default"):
+                values.append(f.default)
+            else:
+                raise SQLValueError(f.attr)
+        self.insert_values.append(values)
 
     def _build_sql(self):
-        if not self.insert_value:
+        if not self.insert_values:
             raise SQLValueError("insert value is empty")
 
         sql_parts = ["INSERT", "INTO", self.model_meta.table]
@@ -306,11 +270,18 @@ class InsertSQLBuilder(BaseSQLBuilder):
             for f in self.model_meta.fields
         ]))
         sql_parts.extend(["VALUES"])
-        sql_parts.extend(self.insert_value._as_sql())
+
+        value_statement = "(%s)" % ",".join(
+            "?" for i in self.model_meta.fields
+        )
+        sql_parts.append(",".join(value_statement for i in self.insert_values))
         return "%s;" % " ".join(sql_parts)
 
     def _build_parameters(self):
-        return self.insert_value._as_parameters()
+        params = []
+        for i in self.insert_values:
+            params.extend(i)
+        return tuple(params)
 
 
 class UpdateSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
