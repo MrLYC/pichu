@@ -89,3 +89,23 @@ class TestInsertSQLBuilder(TestCase):
             builder._build_parameters(),
             (1, "test1", 1, 2, "test2", TestModel.value.default),
         )
+
+
+class TestUpdateSQLBuilder(TestCase):
+    def test_update(self):
+        builder = sql_builder.UpdateSQLBuilder(TestModel.X)
+        builder.update(name="test", value=2)
+        builder.where(sql_builder.MultiConditionSQLPartBuilder.and_(
+            sql_builder.ConditionExpSQLPartBuilder("id", ">", 2),
+            sql_builder.ConditionExpSQLPartBuilder("value", "=", 1),
+        ))
+        self.assertEqual(
+            builder._build_sql(),
+            'UPDATE %s SET name=?,value=? WHERE (("id">?) and ("value"=?));' % (
+                TestModel.X.table,
+            )
+        )
+        self.assertTupleEqual(
+            builder._build_parameters(),
+            ("test", 2, 2, 1)
+        )

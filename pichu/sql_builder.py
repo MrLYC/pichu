@@ -1,5 +1,5 @@
 from copy import deepcopy
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 from pichu.utils import chaining_method
 
@@ -44,7 +44,8 @@ class MultiConditionSQLPartBuilder(MergeableSQLPartBuilder):
         self.right = right
 
     def _merge_from(self, left):
-        self.left = left
+        if left:
+            self.left = left
         return self
 
     def _as_sql(self):
@@ -84,58 +85,6 @@ class MultiConditionSQLPartBuilder(MergeableSQLPartBuilder):
         return cls(left=left, operator="or", right=right)
 
 
-class AppendableSQLPartBuilder(SQLPartBuilder):
-
-    def _append_from(self, part):
-        return self
-
-
-class UpdateValueSQLPartBuilder(AppendableSQLPartBuilder):
-
-    def __init__(self, model_meta, **kwargs):
-        self.model_meta = model_meta
-        self.keys = []
-        self.values = []
-        self.last = None
-
-        for f in model_meta.fields:
-            if f.attr not in kwargs:
-                continue
-
-            value = kwargs.pop(f.attr)
-
-            self.keys.append(f.column)
-            self.values.append(value)
-
-        self.keys = tuple(self.keys)
-        self.values = tuple(self.values)
-
-        super(UpdateValueSQLPartBuilder, self).__init__()
-
-    def _append_from(self, last):
-        self.last = last
-        return self
-
-    def _as_sql(self):
-        if self.last:
-            values = self.last._as_sql()
-        else:
-            values = ()
-
-        sql_parts = values + (
-            "%s=?" % k
-            for k in self.keys
-        )
-        return ", ".join(sql_parts)
-
-    def _as_parameters(self):
-        if self.last:
-            values = self.last._as_parameters()
-        else:
-            values = ()
-        return values + self.values
-
-
 class BaseSQLBuilder(object):
 
     def __init__(self, model_meta):
@@ -168,7 +117,7 @@ class WherePartSQLBuilderMixin(object):
     def _build_where_sql_parts(self, sql_parts):
         if self.where_condition:
             sql_parts.extend(["WHERE"])
-            sql_parts.extend(self.where_condition._as_sql())
+            sql_parts.append(self.where_condition._as_sql())
 
     def _build_where_sql_parameters(self):
         if self.where_condition:
@@ -288,22 +237,29 @@ class UpdateSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
     def __init__(self, model_meta):
         super(UpdateSQLBuilder, self).__init__(model_meta)
-        self.update_value = None
+        self.update_value = OrderedDict()
 
     @chaining_method
-    def update(self, value):
-        self.update_value = value._append_from(self.update_value)
+    def update(self, **kwargs):
+        for f in self.model_meta.fields:
+            if f.attr in kwargs:
+                self.update_value[f.column] = kwargs.pop(f.attr)
 
     def _build_sql(self):
         if not self.update_value:
             raise SQLValueError("update value is empty")
 
         sql_parts = ["UPDATE", self.model_meta.table]
-        sql_parts.extend(["SET", self.update_value._as_sql()])
+        sql_parts.extend(["SET"])
+        sql_parts.append(",".join(
+            "%s=?" % f
+            for f in self.update_value.keys()
+        ))
         self._build_where_sql_parts(sql_parts)
+        return "%s;" % " ".join(sql_parts)
 
     def _build_parameters(self):
-        params = self.update_value._as_parameters()
+        params = tuple(self.update_value.values())
         return params + self._build_where_sql_parameters()
 
 
