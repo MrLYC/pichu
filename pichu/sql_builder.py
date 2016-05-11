@@ -90,6 +90,10 @@ class BaseSQLBuilder(object):
     def __init__(self, model_meta):
         super(BaseSQLBuilder, self).__init__()
         self.model_meta = model_meta
+        self.field_mappings = {
+            f.attr: f
+            for f in model_meta.fields
+        }
 
     def copy(self):
         return deepcopy(self)
@@ -142,23 +146,27 @@ class SelectSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
         self.sort_order_type = None
 
     @chaining_method
-    def limit(self, offset, count):
+    def limit(self, count, offset=None):
         self.limit_offset = offset
         self.limit_count = count
 
     @chaining_method
     def order_by(self, *fields):
-        if self.sort_order_type is None:
-            self.sort_order(self.SortOrderTypes.DEFAULT)
+        self.order_by_fields = OrderedDict()
+        for f in fields:
+            if f.startswith("+"):
+                attr = f[1:]
+                sort_order = self.SortOrderTypes.ASC
+            elif f.startswith("-"):
+                attr = f[1:]
+                sort_order = self.SortOrderTypes.DESC
+            else:
+                attr = f
+                sort_order = self.SortOrderTypes.DEFAULT
 
-        self.order_by_fields = fields
-
-    @chaining_method
-    def sort_order(self, type_):
-        if type_ not in self.SortOrderTypes:
-            raise SQLValueError("%s not allowed" % type_)
-
-        self.sort_order_type = type_
+            if attr not in self.field_mappings:
+                raise SQLValueError(attr)
+            self.order_by_fields[attr] = sort_order
 
     def _parse_db_result(self, result):
         values = {
@@ -181,9 +189,20 @@ class SelectSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
         if self.order_by_fields:
             sql_parts.extend([
-                "ORDER BY", '"%s"' % self.order_by_fields,
-                self.sort_order_type,
+                "ORDER BY", ",".join(
+                    '"%s" %s' % (f, order)
+                    for f, order in self.order_by_fields.items()
+                ),
             ])
+
+        if self.limit_count:
+            sql_parts.extend([
+                "LIMIT", "%s" % self.limit_count,
+            ])
+            if self.limit_offset:
+                sql_parts.extend([
+                    "OFFSET", "%s" % self.limit_offset,
+                ])
 
         return "%s;" % " ".join(sql_parts)
 

@@ -123,3 +123,46 @@ class TestDeleteSQLBuilder(TestCase):
             builder._build_sql(),
             "DELETE FROM %s WHERE (id=?)" % TestModel.X.table
         )
+
+
+class TestSelectSQLBuilder(TestCase):
+
+    def test_select_all(self):
+        builder = sql_builder.SelectSQLBuilder(TestModel.X)
+        self.assertEqual(
+            builder._build_sql(),
+            'SELECT "id","name","value" FROM %s;' % TestModel.X.table
+        )
+
+    def test_where(self):
+        builder = sql_builder.SelectSQLBuilder(TestModel.X)
+        builder.where(sql_builder.ConditionExpSQLPartBuilder("id", "=", 1))
+        self.assertEqual(
+            builder._build_sql(),
+            (
+                'SELECT "id","name","value" FROM %s '
+                'WHERE ("id"=?);'
+            ) % TestModel.X.table
+        )
+
+    def test_limit(self):
+        builder = sql_builder.SelectSQLBuilder(TestModel.X)
+        builder.limit(5, 10)
+        self.assertEqual(
+            builder._build_sql(),
+            (
+                'SELECT "id","name","value" FROM %s '
+                'LIMIT 5 OFFSET 10;'
+            ) % TestModel.X.table
+        )
+
+    def test_order_by(self):
+        builder = sql_builder.SelectSQLBuilder(TestModel.X)
+        builder.order_by("id", "-name", "+value")
+        self.assertEqual(
+            builder._build_sql(),
+            (
+                'SELECT "id","name","value" FROM %s '
+                'ORDER BY "id" ASC,"name" DESC,"value" ASC;'
+            ) % TestModel.X.table
+        )
