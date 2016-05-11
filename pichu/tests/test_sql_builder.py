@@ -75,6 +75,7 @@ class TestMultiConditionSQLPartBuilder(TestCase):
 
 
 class TestInsertSQLBuilder(TestCase):
+
     def test_insert(self):
         builder = sql_builder.InsertSQLBuilder(TestModel.X)
         builder.insert(id=1, name="test1", value=1)
@@ -92,6 +93,7 @@ class TestInsertSQLBuilder(TestCase):
 
 
 class TestUpdateSQLBuilder(TestCase):
+
     def test_update(self):
         builder = sql_builder.UpdateSQLBuilder(TestModel.X)
         builder.update(name="test", value=2)
@@ -101,11 +103,23 @@ class TestUpdateSQLBuilder(TestCase):
         ))
         self.assertEqual(
             builder._build_sql(),
-            'UPDATE %s SET name=?,value=? WHERE (("id">?) and ("value"=?));' % (
-                TestModel.X.table,
-            )
+            (
+                'UPDATE %s SET name=?,value=? '
+                'WHERE (("id">?) and ("value"=?));'
+            ) % TestModel.X.table
         )
         self.assertTupleEqual(
             builder._build_parameters(),
             ("test", 2, 2, 1)
+        )
+
+
+class TestDeleteSQLBuilder(TestCase):
+
+    def tedt_delete(self):
+        builder = sql_builder.DeleteSQLBuilder(TestModel.X)
+        builder.where(sql_builder.ConditionExpSQLPartBuilder("id", "=", 1))
+        self.assertEqual(
+            builder._build_sql(),
+            "DELETE FROM %s WHERE (id=?)" % TestModel.X.table
         )
