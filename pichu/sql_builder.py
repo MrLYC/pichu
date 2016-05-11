@@ -29,7 +29,7 @@ class ConditionExpSQLPartBuilder(MergeableSQLPartBuilder):
         self.value = value
 
     def _as_sql(self):
-        return ['"%s" %s ?' % (self.field, self.operator)]
+        return '("%s"%s?)' % (self.field, self.operator)
 
     def _as_parameters(self):
         return (self.value,)
@@ -38,7 +38,7 @@ class ConditionExpSQLPartBuilder(MergeableSQLPartBuilder):
 class MultiConditionSQLPartBuilder(MergeableSQLPartBuilder):
 
     def __init__(self, right, operator, left=None):
-        super(ConditionExpSQLPartBuilder, self).__init__()
+        super(MultiConditionSQLPartBuilder, self).__init__()
         self.left = left
         self.operator = operator
         self.right = right
@@ -52,7 +52,7 @@ class MultiConditionSQLPartBuilder(MergeableSQLPartBuilder):
             self.right,
             (ConditionExpSQLPartBuilder, MultiConditionSQLPartBuilder)
         ):
-            right_exp = "(%s)" % self.right._as_sql()
+            right_exp = self.right._as_sql()
         else:
             right_exp = self.right
 
@@ -63,11 +63,11 @@ class MultiConditionSQLPartBuilder(MergeableSQLPartBuilder):
             self.left,
             (ConditionExpSQLPartBuilder, MultiConditionSQLPartBuilder)
         ):
-            left_exp = "(%s)" % self.left._as_sql()
+            left_exp = self.left._as_sql()
         else:
             left_exp = self.left
 
-        return "%s %s %s" % (left_exp, self.operator, right_exp)
+        return "(%s %s %s)" % (left_exp, self.operator, right_exp)
 
     def _as_parameters(self):
         params = self.right._as_parameters()

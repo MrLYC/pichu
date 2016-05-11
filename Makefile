@@ -1,3 +1,3 @@
 .PHONY: test
 test:
-	py.test pichu -v
+	py.test pichu -v -x
