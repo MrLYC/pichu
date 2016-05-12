@@ -82,7 +82,10 @@ class TestInsertSQLBuilder(TestCase):
         builder.insert(id=2, name="test2")
         self.assertEqual(
             builder._build_sql(),
-            'INSERT INTO %s ("id","name","value") VALUES (?,?,?),(?,?,?);' % (
+            (
+                'INSERT INTO %s ("id", "name", "value") VALUES '
+                '(?, ?, ?), (?, ?, ?);'
+            ) % (
                 TestModel.X.table,
             )
         )
@@ -104,7 +107,7 @@ class TestUpdateSQLBuilder(TestCase):
         self.assertEqual(
             builder._build_sql(),
             (
-                'UPDATE %s SET name=?,value=? '
+                'UPDATE %s SET name=?, value=? '
                 'WHERE (("id">?) and ("value"=?));'
             ) % TestModel.X.table
         )
@@ -131,7 +134,7 @@ class TestSelectSQLBuilder(TestCase):
         builder = sql_builder.SelectSQLBuilder(TestModel.X)
         self.assertEqual(
             builder._build_sql(),
-            'SELECT "id","name","value" FROM %s;' % TestModel.X.table
+            'SELECT "id", "name", "value" FROM %s;' % TestModel.X.table
         )
 
     def test_where(self):
@@ -140,7 +143,7 @@ class TestSelectSQLBuilder(TestCase):
         self.assertEqual(
             builder._build_sql(),
             (
-                'SELECT "id","name","value" FROM %s '
+                'SELECT "id", "name", "value" FROM %s '
                 'WHERE ("id"=?);'
             ) % TestModel.X.table
         )
@@ -151,7 +154,7 @@ class TestSelectSQLBuilder(TestCase):
         self.assertEqual(
             builder._build_sql(),
             (
-                'SELECT "id","name","value" FROM %s '
+                'SELECT "id", "name", "value" FROM %s '
                 'LIMIT 5 OFFSET 10;'
             ) % TestModel.X.table
         )
@@ -162,7 +165,20 @@ class TestSelectSQLBuilder(TestCase):
         self.assertEqual(
             builder._build_sql(),
             (
-                'SELECT "id","name","value" FROM %s '
-                'ORDER BY "id" ASC,"name" DESC,"value" ASC;'
+                'SELECT "id", "name", "value" FROM %s '
+                'ORDER BY "id" ASC, "name" DESC, "value" ASC;'
+            ) % TestModel.X.table
+        )
+
+
+class TestCreateTableSQLBuilder(TestCase):
+    def test_create_table(self):
+        builder = sql_builder.CreateTableSQLBuilder(TestModel.X)
+        self.assertEqual(
+            builder._build_sql(),
+            (
+                'CREATE TABLE IF NOT EXISTS "%s" ( '
+                '"id" INT PRIMARY KEY, "name" TEXT, '
+                '"value" DOUBLE DEFAULT 0.0 );'
             ) % TestModel.X.table
         )

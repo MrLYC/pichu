@@ -177,7 +177,7 @@ class SelectSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
     def _build_sql(self):
         sql_parts = ["SELECT"]
-        sql_parts.append(",".join([
+        sql_parts.append(", ".join([
             '"%s"' % f.column
             for f in self.model_meta.fields
         ]))
@@ -189,7 +189,7 @@ class SelectSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
         if self.order_by_fields:
             sql_parts.extend([
-                "ORDER BY", ",".join(
+                "ORDER BY", ", ".join(
                     '"%s" %s' % (f, order)
                     for f, order in self.order_by_fields.items()
                 ),
@@ -233,16 +233,16 @@ class InsertSQLBuilder(BaseSQLBuilder):
             raise SQLValueError("insert value is empty")
 
         sql_parts = ["INSERT", "INTO", self.model_meta.table]
-        sql_parts.append("(%s)" % ",".join([
+        sql_parts.append("(%s)" % ", ".join([
             '"%s"' % f.column
             for f in self.model_meta.fields
         ]))
         sql_parts.extend(["VALUES"])
 
-        value_statement = "(%s)" % ",".join(
+        value_statement = "(%s)" % ", ".join(
             "?" for i in self.model_meta.fields
         )
-        sql_parts.append(",".join(value_statement for i in self.insert_values))
+        sql_parts.append(", ".join(value_statement for i in self.insert_values))
         return "%s;" % " ".join(sql_parts)
 
     def _build_parameters(self):
@@ -270,7 +270,7 @@ class UpdateSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
         sql_parts = ["UPDATE", self.model_meta.table]
         sql_parts.extend(["SET"])
-        sql_parts.append(",".join(
+        sql_parts.append(", ".join(
             "%s=?" % f
             for f in self.update_value.keys()
         ))
@@ -305,7 +305,9 @@ class CreateTableSQLBuilder(BaseSQLBuilder):
                 field = '"%s" %s %s' % (f.column, f.DBType, "PRIMARY KEY")
             else:
                 field = '"%s" %s' % (f.column, f.DBType)
+            if hasattr(f, "default"):
+                field = "%s DEFAULT %r" % (field, f.default)
             field_parts.append(field)
 
-        sql_parts.extend(["(", ",".join(field_parts), ")"])
+        sql_parts.extend(["(", ", ".join(field_parts), ")"])
         return "%s;" % " ".join(sql_parts)

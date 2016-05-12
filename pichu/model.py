@@ -153,6 +153,12 @@ class BaseModel(six.with_metaclass(ModelMeta, object)):
 class SimpleTypeFieldMixin(object):
     ValueConvertor = (lambda x: x)
 
+    def __init__(self, *args, **kwargs):
+        if "default" in kwargs:
+            value = kwargs.pop("default")
+            kwargs["default"] = self.to_model_value(value)
+        super(SimpleTypeFieldMixin, self).__init__(*args, **kwargs)
+
     def to_database_value(self, value):
         return self.ValueConvertor(value)
 
