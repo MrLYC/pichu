@@ -119,12 +119,12 @@ class TestUpdateSQLBuilder(TestCase):
 
 class TestDeleteSQLBuilder(TestCase):
 
-    def tedt_delete(self):
+    def test_delete(self):
         builder = sql_builder.DeleteSQLBuilder(TestModel.X)
         builder.where(sql_builder.ConditionExpSQLPartBuilder("id", "=", 1))
         self.assertEqual(
             builder._build_sql(),
-            "DELETE FROM %s WHERE (id=?)" % TestModel.X.table
+            'DELETE FROM %s WHERE ("id"=?);' % TestModel.X.table
         )
 
 

@@ -287,7 +287,7 @@ class DeleteSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
     def _build_sql(self):
         sql_parts = ["DELETE", "FROM", self.model_meta.table]
         self._build_where_sql_parts(sql_parts)
-        return sql_parts
+        return "%s;" % " ".join(sql_parts)
 
     def _build_parameters(self):
         return self._build_where_sql_parameters()
