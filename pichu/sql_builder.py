@@ -170,7 +170,7 @@ class SelectSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
 
     def _parse_db_result(self, result):
         values = {
-            f.attr: v
+            f.attr: f.to_model_value(v)
             for f, v in zip(self.model_meta.fields, result)
         }
         return self.model_meta.model(**values)
@@ -221,7 +221,8 @@ class InsertSQLBuilder(BaseSQLBuilder):
         values = []
         for f in self.model_meta.fields:
             if f.attr in kwargs:
-                values.append(kwargs.pop(f.attr))
+                value = kwargs.pop(f.attr)
+                values.append(f.to_database_value(value))
             elif hasattr(f, "default"):
                 values.append(f.default)
             else:
@@ -242,7 +243,9 @@ class InsertSQLBuilder(BaseSQLBuilder):
         value_statement = "(%s)" % ", ".join(
             "?" for i in self.model_meta.fields
         )
-        sql_parts.append(", ".join(value_statement for i in self.insert_values))
+        sql_parts.append(", ".join(
+            value_statement for i in self.insert_values
+        ))
         return "%s;" % " ".join(sql_parts)
 
     def _build_parameters(self):
@@ -262,7 +265,8 @@ class UpdateSQLBuilder(BaseSQLBuilder, WherePartSQLBuilderMixin):
     def update(self, **kwargs):
         for f in self.model_meta.fields:
             if f.attr in kwargs:
-                self.update_value[f.column] = kwargs.pop(f.attr)
+                value = kwargs.pop(f.attr)
+                self.update_value[f.column] = f.to_database_value(value)
 
     def _build_sql(self):
         if not self.update_value:

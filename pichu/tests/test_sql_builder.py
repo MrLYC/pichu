@@ -78,7 +78,7 @@ class TestInsertSQLBuilder(TestCase):
 
     def test_insert(self):
         builder = sql_builder.InsertSQLBuilder(TestModel.X)
-        builder.insert(id=1, name="test1", value=1)
+        builder.insert(id=1, name="test1", value="1")
         builder.insert(id=2, name="test2")
         self.assertEqual(
             builder._build_sql(),
@@ -91,7 +91,7 @@ class TestInsertSQLBuilder(TestCase):
         )
         self.assertTupleEqual(
             builder._build_parameters(),
-            (1, "test1", 1, 2, "test2", TestModel.value.default),
+            (1, "test1", 1.0, 2, "test2", TestModel.value.default),
         )
 
 
@@ -99,7 +99,7 @@ class TestUpdateSQLBuilder(TestCase):
 
     def test_update(self):
         builder = sql_builder.UpdateSQLBuilder(TestModel.X)
-        builder.update(name="test", value=2)
+        builder.update(name="test", value="2")
         builder.where(sql_builder.MultiConditionSQLPartBuilder.and_(
             sql_builder.ConditionExpSQLPartBuilder("id", ">", 2),
             sql_builder.ConditionExpSQLPartBuilder("value", "=", 1),
@@ -113,7 +113,7 @@ class TestUpdateSQLBuilder(TestCase):
         )
         self.assertTupleEqual(
             builder._build_parameters(),
-            ("test", 2, 2, 1)
+            ("test", 2.0, 2, 1)
         )
 
 
